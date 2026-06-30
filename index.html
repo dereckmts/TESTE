@@ -142,6 +142,7 @@
       <option value="implacavel">Implacável</option>
     </select>
     <button id="quizBtn" class="ghost" title="Gerar um quiz com os conceitos da sessão">📝 Quiz</button>
+    <button id="gradeBtn" class="ghost" style="display:none;" title="Corrigir suas respostas do quiz (precisa do Modo IA)">✅ Corrigir</button>
     <button id="aiBtn" class="ghost" title="Ativar IA de verdade (WebLLM no navegador ou chave da Claude)">🤖 IA</button>
     <button id="exportBtn" class="ghost" title="Baixar a conversa como resumo de estudo (.md)">⬇ Resumo</button>
     <button id="resetBtn" class="ghost" title="Começar uma nova sessão de estudo">↻ Nova sessão</button>
@@ -207,6 +208,7 @@
   const resetBtn = document.getElementById("resetBtn");
   const exportBtn = document.getElementById("exportBtn");
   const quizBtn = document.getElementById("quizBtn");
+  const gradeBtn = document.getElementById("gradeBtn");
   const levelEl = document.getElementById("level");
   const conceptCountEl = document.getElementById("conceptCount");
   const subjectsEl = document.getElementById("subjects");
@@ -223,6 +225,10 @@
       turn: 0,
       concepts: 0,
       topic: null,
+      subject: null,        // matéria atual (chip do edital)
+      askedBank: [],        // perguntas do banco já usadas
+      lastQuiz: null,       // texto do último quiz gerado
+      quizAnchor: 0,        // índice das respostas do quiz
       level: "curioso",
       started: false,
       aiEnabled: false,
@@ -242,6 +248,67 @@
     { nome: "Lei de Execução Penal (LEP)", dica: "Lei 7.210/84: direitos e deveres do preso, regimes, faltas, regime disciplinar" },
     { nome: "Sistema Prisional", dica: "SUSEPE, Polícia Penal, Regras de Mandela, segurança penitenciária, revista, escolta" },
   ];
+
+  // Banco de perguntas específicas do edital. O aluno (curioso) usa estas
+  // perguntas quando você está numa matéria, para te cobrar o que a banca cobra.
+  // São perguntas — não afirmações — para te fazer EXPLICAR cada ponto.
+  const SUBJECT_BANK = {
+    "Língua Portuguesa": [
+      "Me explica quando usa crase e quando NÃO usa — e por que tanta gente erra isso?",
+      "Qual a diferença entre concordância verbal e nominal? Me dá um exemplo de cada.",
+      "O que é regência verbal? Me explica com um verbo que muda de sentido conforme a regência.",
+      "Como a pontuação pode mudar o sentido de uma frase? Me dá um exemplo.",
+      "O que diferencia denotação de conotação num texto?",
+      "Me explica a diferença entre 'mas', 'mais' e 'más'.",
+      "O que é uma oração subordinada? Como eu reconheço uma na prova?",
+    ],
+    "Informática": [
+      "Me explica a diferença entre um vírus, um worm e um phishing.",
+      "O que é um backup e por que a regra '3-2-1' é tão citada?",
+      "No Excel, pra que serve a função PROCV (ou PROCX)? Me dá um caso de uso.",
+      "Qual a diferença entre memória RAM e armazenamento (HD/SSD)?",
+      "O que faz o protocolo HTTPS que o HTTP não faz?",
+      "Me explica o que é a nuvem (cloud) na prática.",
+      "Atalhos do Windows: o que fazem Ctrl+C, Ctrl+V, Ctrl+Z e Ctrl+Shift+Esc?",
+    ],
+    "Raciocínio Lógico": [
+      "Me explica o que é uma proposição e o que NÃO é uma proposição.",
+      "Como funciona a tabela-verdade do 'e' (conjunção) e do 'ou' (disjunção)?",
+      "Qual a negação de 'Todo policial é honesto'? Por que tanta gente erra?",
+      "Me explica as Leis de De Morgan com um exemplo.",
+      "Qual a diferença entre uma condicional 'se...então' e sua recíproca?",
+      "O que torna um argumento válido? Validade é o mesmo que verdade?",
+      "Diferença entre permutação, arranjo e combinação — quando uso cada um?",
+    ],
+    "Legislação Aplicada / Direito": [
+      "Me explica o que são os direitos e garantias fundamentais do art. 5º da Constituição.",
+      "O que mudou com a EC 104/2019 ao criar a Polícia Penal no art. 144?",
+      "Qual a diferença entre prisão em flagrante, preventiva e temporária?",
+      "O que caracteriza o crime de tortura (Lei 9.455/97)?",
+      "Me explica o que é abuso de autoridade segundo a Lei 13.869/19.",
+      "Qual a diferença entre dolo e culpa no Direito Penal?",
+      "O que são os princípios da legalidade e da presunção de inocência?",
+    ],
+    "Lei de Execução Penal (LEP)": [
+      "Me explica a diferença entre os regimes fechado, semiaberto e aberto.",
+      "Como funcionam a progressão e a regressão de regime?",
+      "Qual a diferença entre remição e detração da pena?",
+      "Quais são as faltas graves do art. 50 da LEP e o que elas acarretam?",
+      "O que é o RDD (Regime Disciplinar Diferenciado) e quando ele se aplica?",
+      "Quais assistências o Estado deve ao preso (art. 11)? Cita as que lembrar.",
+      "Qual a diferença entre permissão de saída e saída temporária?",
+      "Como funciona a remição por trabalho e por estudo? Quantos dias valem?",
+    ],
+    "Sistema Prisional": [
+      "O que é a SUSEPE e qual o papel dela no Rio Grande do Sul?",
+      "O que faz a Polícia Penal? Como ela se diferencia das outras polícias?",
+      "Me explica o que são as Regras de Mandela e por que elas importam.",
+      "Quais são os tipos de estabelecimentos penais (penitenciária, colônia, cadeia pública...)?",
+      "Como funciona a revista? Qual o cuidado com a dignidade da pessoa?",
+      "O que é uma escolta e quais os principais cuidados de segurança nela?",
+      "Quais são os deveres e os direitos do preso dentro do estabelecimento?",
+    ],
+  };
 
   function loadState() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY)); }
@@ -310,6 +377,14 @@
 
   function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
   function termKey(t) { return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+
+  // Uma pergunta do banco do edital da mat\u00e9ria atual, ainda n\u00e3o usada.
+  function bankQuestion() {
+    const bank = state.subject && SUBJECT_BANK[state.subject];
+    if (!bank) return null;
+    const fresh = bank.filter(q => !state.askedBank.includes(q));
+    return fresh.length ? fresh[Math.floor(Math.random() * fresh.length)] : null;
+  }
 
   // Um termo "antigo" (n\u00e3o est\u00e1 entre os 2 mais recentes) e ainda n\u00e3o revisado.
   function recallableTerm() {
@@ -422,6 +497,10 @@
     // De tempos em tempos, foco em prova
     if (state.turn > 0 && state.turn % 4 === 0) candidates.push(["prova", 3]);
 
+    // Banco do edital: se você está numa matéria do PPRS, cobra perguntas
+    // específicas de concurso que ainda não foram usadas.
+    if (bankQuestion()) candidates.push(["edital", 6]);
+
     // Recall (active recall): a partir de algumas rodadas, cobra de volta um
     // conceito antigo que você ainda não revisou.
     if (state.turn >= 4 && recallableTerm()) candidates.push(["recall", 4]);
@@ -456,9 +535,14 @@
     else if (terms.length) term = pick(terms);
     else if (state.seenTerms.length) term = pick(state.seenTerms);
 
-    let tpl = pick(TEMPLATES[strategy]);
+    // "edital" e estratégias sem template próprio são tratadas nas ramificações abaixo.
+    let tpl = TEMPLATES[strategy] ? pick(TEMPLATES[strategy]) : "";
 
-    if (strategy === "recall") {
+    if (strategy === "edital") {
+      const q = bankQuestion();
+      if (q) { state.askedBank.push(q); return q; }
+      tpl = pick(TEMPLATES.porque); // fallback raro
+    } else if (strategy === "recall") {
       const r = recallableTerm();
       if (r) {
         state.recalledTerms.push(termKey(r));
@@ -639,6 +723,8 @@
       b.innerHTML = "<b>+</b> " + s.nome;
       b.title = "Tópicos: " + s.dica;
       b.addEventListener("click", () => {
+        state.subject = s.nome;
+        saveState();
         inputEl.value = "Vou te explicar sobre " + s.nome + ": ";
         inputEl.focus();
         inputEl.dispatchEvent(new Event("input"));
@@ -649,8 +735,8 @@
 
   // ----------------------------- Quiz -----------------------------
   async function runQuiz() {
-    if (state.seenTerms.length < 2 && !state.topic) {
-      addBubble("bot", "Explica pelo menos um pouco de alguma matéria primeiro — aí eu monto um quiz em cima do que você falou. 😉");
+    if (state.seenTerms.length < 2 && !state.topic && !state.subject) {
+      addBubble("bot", "Escolha uma matéria no rodapé ou me explique um pouco primeiro — aí eu monto um quiz. 😉");
       return;
     }
     showTyping();
@@ -660,15 +746,42 @@
     }
     hideTyping();
     if (!quiz) quiz = heuristicQuiz();
-    addBubble("bot", "📝 Quiz relâmpago — responde com suas palavras, sem olhar nada:\n\n" + quiz);
+    addBubble("bot", "📝 Quiz relâmpago — responde com suas palavras, sem olhar nada:\n\n" + quiz +
+      "\n\nResponda aqui no chat e clique em ✅ Corrigir quando terminar.");
+    state.lastQuiz = quiz;
+    state.quizAnchor = state.messages.length; // respostas vêm depois daqui
+    gradeBtn.style.display = "";
+    saveState();
+  }
+
+  async function gradeQuiz() {
+    if (!state.lastQuiz) { addBubble("bot", "Gere um quiz primeiro (📝 Quiz)."); return; }
+    const answers = state.messages.slice(state.quizAnchor)
+      .filter(m => m.who === "me").map(m => m.text).join("\n");
+    if (!answers.trim()) { addBubble("bot", "Responda as perguntas do quiz aqui no chat antes de eu corrigir. 😉"); return; }
+    if (!AI.ready()) {
+      addBubble("bot", "Para eu corrigir e dar nota de verdade, ative o 🤖 Modo IA. Sem IA eu não consigo avaliar se a resposta está certa — mas compare com seu material e veja onde travou.");
+      return;
+    }
+    showTyping();
+    let out = null;
+    try { out = await AI.grade(state.lastQuiz, answers); } catch (e) { out = null; }
+    hideTyping();
+    addBubble("bot", out || "Não consegui corrigir agora (a IA falhou). Tente de novo.");
     saveState();
   }
 
   function heuristicQuiz() {
-    const terms = state.seenTerms.slice(-8);
     const qs = [];
     const used = new Set();
-    const add = (q) => { if (qs.length < 5) qs.push((qs.length + 1) + ") " + q); };
+    const add = (q) => { if (qs.length < 5 && !used.has(q)) { used.add(q); qs.push((qs.length + 1) + ") " + q); } };
+    // Se está numa matéria, prioriza perguntas reais do edital.
+    const bank = state.subject && SUBJECT_BANK[state.subject];
+    if (bank) {
+      const shuffled = bank.slice().sort(() => Math.random() - 0.5);
+      for (const q of shuffled) { add(q); if (qs.length >= 3) break; }
+    }
+    const terms = state.seenTerms.slice(-8);
     for (const t of terms) {
       if (used.has(t)) continue; used.add(t);
       const kind = qs.length % 3;
@@ -678,7 +791,7 @@
       if (qs.length >= 5) break;
     }
     if (terms.length >= 2) add('Qual a diferença entre "' + terms[terms.length - 1] + '" e "' + terms[terms.length - 2] + '"?');
-    while (qs.length < 3 && state.topic) add('Resuma os pontos principais de "' + state.topic + '".');
+    if (qs.length < 3 && state.topic) add('Resuma os pontos principais de "' + state.topic + '".');
     return qs.join("\n");
   }
 
@@ -716,7 +829,14 @@
       return msgs;
     }
 
-    async function callClaude(messages) {
+    const GRADER =
+      "Você é um corretor experiente de concursos da área de Polícia Penal/execução penal. " +
+      "Receberá um quiz e as respostas do candidato. Corrija em português do Brasil, de forma " +
+      "objetiva e gentil: para cada questão, diga se está Certo / Parcial / Errado, aponte o erro " +
+      "ou o que faltou e dê a resposta correta em 1-2 frases. No final, dê uma NOTA de 0 a 10 e " +
+      "uma dica curta do que revisar. Seja conciso.";
+
+    async function callClaude(messages, sys) {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -727,8 +847,8 @@
         },
         body: JSON.stringify({
           model: state.aiModel || "claude-haiku-4-5",
-          max_tokens: 400,
-          system: SYSTEM,
+          max_tokens: 700,
+          system: sys || SYSTEM,
           messages,
         }),
       });
@@ -738,13 +858,20 @@
       return block ? block.text.trim() : null;
     }
 
-    async function callWebLLM(messages) {
+    async function callWebLLM(messages, sys) {
       const reply = await engine.chat.completions.create({
-        messages: [{ role: "system", content: SYSTEM }, ...messages],
-        temperature: 0.7,
-        max_tokens: 300,
+        messages: [{ role: "system", content: sys || SYSTEM }, ...messages],
+        temperature: 0.6,
+        max_tokens: 600,
       });
       return reply.choices[0].message.content.trim();
+    }
+
+    async function grade(quizText, answersText) {
+      const prompt = "QUIZ:\n" + quizText + "\n\nRESPOSTAS DO CANDIDATO:\n" + answersText +
+        "\n\nCorrija questão por questão e dê a nota final.";
+      const messages = [{ role: "user", content: prompt }];
+      return state.aiProvider === "claude" ? callClaude(messages, GRADER) : callWebLLM(messages, GRADER);
     }
 
     async function respond(userText) {
@@ -814,7 +941,7 @@
 
     function disable() { state.aiEnabled = false; saveState(); }
 
-    return { ready, respond, quiz, activate, disable, active, setStatus };
+    return { ready, respond, quiz, grade, activate, disable, active, setStatus };
   })();
 
   // ----------------------------- Painel de IA -----------------------------
@@ -861,6 +988,7 @@
   });
   levelEl.addEventListener("change", () => { state.level = levelEl.value; saveState(); });
   quizBtn.addEventListener("click", runQuiz);
+  gradeBtn.addEventListener("click", gradeQuiz);
   resetBtn.addEventListener("click", () => {
     if (confirm("Começar uma nova sessão? A conversa atual será apagada.")) {
       const keepAi = { aiEnabled: state.aiEnabled, aiProvider: state.aiProvider, aiModel: state.aiModel, aiKey: state.aiKey };
@@ -869,6 +997,7 @@
       Object.assign(state, keepAi);
       saveState();
       chatEl.innerHTML = "";
+      gradeBtn.style.display = "none";
       startIfNeeded();
     }
   });
@@ -877,6 +1006,7 @@
   // ----------------------------- Boot -----------------------------
   renderSubjects();
   syncAiPanel();
+  if (state.lastQuiz) gradeBtn.style.display = "";
   startIfNeeded();
   inputEl.focus();
 })();

@@ -33,9 +33,13 @@ A prova objetiva tem 80 questões. Os chips do bot seguem as disciplinas do edit
 - **Níveis de curiosidade** (Tranquilo / Curioso / Implacável) — o quanto o aluno te cobra.
 - **Perguntas variadas e contextuais:** definição, exemplo, causa, consequência, comparação,
   resumo de confirmação e foco em prova.
+- **🎯 Banco do edital:** ao escolher uma matéria, o aluno também cobra perguntas específicas
+  do PPRS (ex.: *"diferença entre remição e detração?"*, *"quais são as faltas graves do art. 50
+  da LEP?"*, *"o que mudou com a EC 104/2019 ao criar a Polícia Penal?"*) — funciona sem IA.
 - **🔁 Recall (revisão ativa):** depois de algumas rodadas, o aluno volta e te pede para
   re-explicar um conceito antigo, sem olhar — o jeito mais eficaz de fixar.
-- **📝 Quiz:** gera 5 perguntas a partir do que vocês conversaram, para você se autotestar.
+- **📝 Quiz + ✅ Corrigir:** gera 5 perguntas a partir da matéria/conversa. Responda no chat e,
+  com o **Modo IA** ligado, clique em *Corrigir* para receber **nota e onde você errou**.
 - **⬇ Resumo:** baixa a conversa como `.md` para revisar depois.
 - **↻ Nova sessão:** zera para começar outra matéria.
 
