@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aluno Curioso — estude explicando</title>
+<style>
+  :root {
+    --bg: #0f1226;
+    --panel: #181c3a;
+    --panel-2: #1f2450;
+    --accent: #6c8cff;
+    --accent-2: #ffb86c;
+    --text: #e8ebff;
+    --muted: #9aa0c8;
+    --bot: #232a5c;
+    --me: #2f3d7a;
+    --ok: #5ad19a;
+    --border: #2c3263;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 80% -10%, #20275c 0%, var(--bg) 60%);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(15,18,38,0.6);
+    backdrop-filter: blur(6px);
+  }
+  header .logo {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; font-size: 22px;
+    flex: 0 0 auto;
+  }
+  header h1 { font-size: 17px; margin: 0; }
+  header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .controls label { font-size: 12px; color: var(--muted); }
+  select, button {
+    font: inherit;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.ghost { background: transparent; }
+  .stats { font-size: 12px; color: var(--muted); }
+  .stats b { color: var(--accent-2); }
+
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 860px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .msg { display: flex; gap: 10px; align-items: flex-end; max-width: 85%; }
+  .msg .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 18px; flex: 0 0 auto;
+  }
+  .msg .bubble {
+    padding: 12px 15px; border-radius: 16px; line-height: 1.5;
+    border: 1px solid var(--border); white-space: pre-wrap;
+  }
+  .msg.bot { align-self: flex-start; }
+  .msg.bot .avatar { background: var(--bot); }
+  .msg.bot .bubble { background: var(--bot); border-bottom-left-radius: 4px; }
+  .msg.me { align-self: flex-end; flex-direction: row-reverse; }
+  .msg.me .avatar { background: var(--me); }
+  .msg.me .bubble { background: var(--me); border-bottom-right-radius: 4px; }
+  .msg .bubble small { display:block; color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 20px;
+    background: rgba(15,18,38,0.6);
+  }
+  .composer {
+    max-width: 860px; margin: 0 auto;
+    display: flex; gap: 10px; align-items: flex-end;
+  }
+  textarea {
+    flex: 1; resize: none; min-height: 48px; max-height: 160px;
+    font: inherit; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; line-height: 1.4;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  .send {
+    background: linear-gradient(135deg, var(--accent), #8aa2ff);
+    border: none; color: #0d1030; font-weight: 700; padding: 13px 18px;
+  }
+  .hint { max-width: 860px; margin: 8px auto 0; font-size: 11px; color: var(--muted); text-align: center; }
+  .typing { font-style: italic; color: var(--muted); }
+  @media (max-width: 640px){
+    .msg { max-width: 95%; }
+    header h1 { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🧑‍🎓</div>
+  <div>
+    <h1>Aluno Curioso</h1>
+    <p>Você é o professor. Explique a matéria e deixe que eu te encha de perguntas.</p>
+  </div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <span class="stats">Conceitos explicados: <b id="conceptCount">0</b></span>
+    <label for="level">Curiosidade</label>
+    <select id="level" title="O quanto eu vou te cobrar">
+      <option value="tranquilo">Tranquilo</option>
+      <option value="curioso" selected>Curioso</option>
+      <option value="implacavel">Implacável</option>
+    </select>
+    <button id="exportBtn" class="ghost" title="Baixar a conversa como resumo de estudo (.md)">⬇ Resumo</button>
+    <button id="resetBtn" class="ghost" title="Começar uma nova sessão de estudo">↻ Nova sessão</button>
+  </div>
+</header>
+
+<main id="chat" aria-live="polite"></main>
+
+<footer>
+  <div class="composer">
+    <textarea id="input" placeholder="Explique um conceito como se eu fosse seu aluno... (Enter envia, Shift+Enter quebra linha)"></textarea>
+    <button class="send" id="sendBtn">Enviar ▸</button>
+  </div>
+  <div class="hint">Roda 100% no seu navegador. Sua conversa fica salva só nesta máquina (localStorage) — nada é enviado para a internet.</div>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ----------------------------- Estado -----------------------------
+  const STORE_KEY = "aluno-curioso-v1";
+  const chatEl = document.getElementById("chat");
+  const inputEl = document.getElementById("input");
+  const sendBtn = document.getElementById("sendBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const exportBtn = document.getElementById("exportBtn");
+  const levelEl = document.getElementById("level");
+  const conceptCountEl = document.getElementById("conceptCount");
+
+  let state = loadState() || freshState();
+
+  function freshState() {
+    return {
+      messages: [],          // { who: 'bot'|'me', text, t }
+      seenTerms: [],         // termos já mencionados pelo usuário
+      askedTerms: [],        // termos sobre os quais já perguntei
+      lastStrategy: null,
+      turn: 0,
+      concepts: 0,
+      topic: null,
+      level: "curioso",
+      started: false,
+    };
+  }
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)); }
+    catch (e) { return null; }
+  }
+  function saveState() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch (e) {}
+  }
+
+  // ----------------------------- NLP simples (pt-BR) -----------------------------
+  const STOPWORDS = new Set(("a o e é de da do das dos em no na nos nas um uma uns umas que qual quais " +
+    "com sem por para pra pelo pela como mas ou se sua seu suas seus meu minha isso isto esse essa este esta " +
+    "ele ela eles elas eu voce você nós nos lhe me te ao aos à às the and of to é são ser foi era está " +
+    "tem ter há também já não sim muito mais menos quando onde porque pois então assim sobre entre cada todo " +
+    "toda todos todas qualquer algum alguma sempre nunca aqui ali lá só apenas bem mal ainda depois antes " +
+    "fazer faz feito ser estar tinha tinham seria pode posso quero acho sei coisa coisas forma maneira").split(/\s+/));
+
+  function tokenize(text) {
+    return text
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos p/ comparar
+      .replace(/[^a-z0-9\s-]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  // Extrai termos-chave: nomes próprios (capitalizados no original) e palavras técnicas longas.
+  function extractTerms(rawText) {
+    const terms = [];
+    const seen = new Set();
+
+    // 1) Sequências capitalizadas no texto original (ex.: "Controle de Constitucionalidade").
+    //    A continuação só aceita conectores curtos (de/da/e/em...) seguidos de outra
+    //    palavra capitalizada, ou diretamente outra capitalizada — assim verbos em
+    //    minúsculo ("te explicar") não são absorvidos no termo.
+    const capRe = /\b[A-ZÀ-Ý][\wçãõáéíóúâêôàü-]+(?:\s+(?:d[aeo]s?|e|em|para)\s+[A-ZÀ-Ý][\wçãõáéíóúâêôàü-]+|\s+[A-ZÀ-Ý][\wçãõáéíóúâêôàü-]+){0,3}\b/g;
+    let m;
+    while ((m = capRe.exec(rawText)) !== null) {
+      const phrase = m[0].trim();
+      const key = phrase.toLowerCase();
+      const isSingle = phrase.split(/\s+/).length === 1;
+      // Palavra única e capitalizada só conta se NÃO for início de frase (evita pegar
+      // "Vou", "Existe", "Sim" só por estarem no começo) e não for stopword.
+      if (isSingle) {
+        const before = rawText.slice(0, m.index);
+        const atSentenceStart = before.trim() === "" || /[.!?:\n]\s*$/.test(before);
+        const noAccent = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (phrase.length < 4 || atSentenceStart || STOPWORDS.has(noAccent)) continue;
+      }
+      if (!seen.has(key)) { seen.add(key); terms.push(phrase); }
+    }
+
+    // 2) Palavras longas (provavelmente jargão)
+    const words = rawText.split(/\s+/);
+    for (const w of words) {
+      const clean = w.replace(/[^\wçãõáéíóúâêôàüÀ-Ý-]/g, "");
+      const norm = clean.toLowerCase();
+      const noAccent = norm.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (clean.length >= 7 && !STOPWORDS.has(noAccent) && !seen.has(norm)) {
+        seen.add(norm); terms.push(clean);
+      }
+    }
+    return terms;
+  }
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function termKey(t) { return t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+
+  // ----------------------------- Banco de perguntas -----------------------------
+  const TEMPLATES = {
+    definicao: [
+      'O que exatamente é "{term}"? Explica como se eu nunca tivesse ouvido falar.',
+      'Não conheço bem esse termo "{term}"... o que ele significa?',
+      'Quando você fala em "{term}", o que isso quer dizer na prática?',
+      'Como eu definiria "{term}" com as minhas próprias palavras?',
+    ],
+    exemplo: [
+      'Você consegue me dar um exemplo concreto de "{term}"?',
+      'Tem algum exemplo do dia a dia que ajude a entender "{term}"?',
+      'Como seria "{term}" numa situação real? Me dá um caso.',
+    ],
+    porque: [
+      'Mas por que isso é assim? Qual é o motivo por trás?',
+      'Por que isso acontece dessa forma, e não de outra?',
+      'E por que isso é importante de saber?',
+    ],
+    comparar: [
+      'Qual é a diferença entre "{a}" e "{b}"?',
+      '"{a}" e "{b}" são a mesma coisa? Onde elas se diferenciam?',
+      'Eu confundo "{a}" com "{b}"... como eu distingo as duas?',
+    ],
+    detalhar: [
+      'Me explica isso com mais detalhes? Fiquei meio perdido.',
+      'Pode ir mais devagar e destrinchar essa parte pra mim?',
+      'Ficou resumido demais pra mim. Pode abrir mais essa ideia?',
+    ],
+    resumir: [
+      'Deixa eu ver se entendi: {summary}. É isso mesmo?',
+      'Então, resumindo o que você disse: {summary}. Tá certo?',
+      'Só pra confirmar — você está dizendo que {summary}, certo?',
+    ],
+    prova: [
+      'E isso costuma cair na prova de que jeito? Tem alguma pegadinha clássica?',
+      'Se um concurso fosse cobrar isso, como você acha que seria a pergunta?',
+      'Qual é o detalhe disso que a banca AMA cobrar e o povo erra?',
+    ],
+    consequencia: [
+      'E o que acontece como consequência disso?',
+      'Isso leva a quê na sequência?',
+      'E qual é o impacto prático disso?',
+    ],
+    aprofundar: [
+      'E existe alguma exceção a essa regra?',
+      'Tem algum caso em que isso NÃO se aplica?',
+      'E se a situação fosse o contrário, mudaria alguma coisa?',
+    ],
+  };
+
+  const REACTIONS = {
+    tranquilo: ["Ah, entendi 👍", "Faz sentido!", "Boa, anotado.", "Saquei."],
+    curioso:   ["Ah, entendi!", "Interessante!", "Boa! Mas fiquei com uma dúvida...", "Hmm, peraí..."],
+    implacavel:["Tá... mas espera.", "Hmm, não me convenceu ainda.", "Ok, mas isso levanta outra dúvida.", "Deixa eu te desafiar:"],
+  };
+
+  // ----------------------------- Geração da resposta do bot -----------------------------
+  function buildSummary(text) {
+    let s = text.trim().replace(/\s+/g, " ");
+    // pega a primeira "frase" e encurta
+    s = s.split(/[.!?\n]/)[0].trim();
+    const words = s.split(" ");
+    if (words.length > 16) s = words.slice(0, 16).join(" ") + "...";
+    s = s.charAt(0).toLowerCase() + s.slice(1);
+    return s;
+  }
+
+  function chooseStrategy(text, terms) {
+    const level = state.level;
+    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+    const hasCausal = /\b(porque|pois|porqu[eê]|devido|por causa|portanto|logo|consequ)/i.test(text);
+    const newTerms = terms.filter(t => !state.askedTerms.includes(termKey(t)));
+    const candidates = [];
+
+    // Resposta de 1-3 palavras ("Sim.", "Não sei"): peça para explicar de verdade.
+    if (wordCount > 0 && wordCount <= 3) return { strategy: "detalhar", newTerms };
+
+    // Resposta curta -> peça para detalhar (prioritário)
+    if (wordCount < 6) candidates.push(["detalhar", 5]);
+
+    // Termos novos -> definição / exemplo
+    if (newTerms.length > 0) {
+      candidates.push(["definicao", 4]);
+      candidates.push(["exemplo", 4]);
+    }
+
+    // Dois termos conhecidos -> comparar
+    if (state.seenTerms.length >= 2) candidates.push(["comparar", 2]);
+
+    // Causalidade citada -> consequência / por quê mais fundo
+    if (hasCausal) { candidates.push(["consequencia", 3]); candidates.push(["porque", 2]); }
+    else candidates.push(["porque", 2]);
+
+    // De tempos em tempos, peça um resumo de confirmação
+    if (state.turn > 0 && state.turn % 3 === 0) candidates.push(["resumir", 4]);
+
+    // De tempos em tempos, foco em prova
+    if (state.turn > 0 && state.turn % 4 === 0) candidates.push(["prova", 3]);
+
+    // Sempre uma chance de aprofundar
+    candidates.push(["aprofundar", 1]);
+
+    // Nível ajusta o peso de "cavar mais fundo"
+    const digBoost = level === "implacavel" ? 3 : level === "curioso" ? 1 : 0;
+    for (const c of candidates) {
+      if (["porque","consequencia","aprofundar","prova","comparar"].includes(c[0])) c[1] += digBoost;
+    }
+    if (level === "tranquilo") {
+      // no modo tranquilo, valoriza confirmar/entender
+      for (const c of candidates) if (["resumir","definicao","exemplo"].includes(c[0])) c[1] += 2;
+    }
+
+    // Evita repetir a mesma estratégia duas vezes seguidas
+    let pool = candidates.filter(c => c[0] !== state.lastStrategy);
+    if (pool.length === 0) pool = candidates;
+
+    // Sorteio ponderado
+    const total = pool.reduce((s, c) => s + c[1], 0);
+    let r = Math.random() * total;
+    for (const c of pool) { r -= c[1]; if (r <= 0) return { strategy: c[0], newTerms }; }
+    return { strategy: pool[0][0], newTerms };
+  }
+
+  function fillTemplate(strategy, text, terms, newTerms) {
+    let term = null;
+    if (newTerms.length) term = pick(newTerms);
+    else if (terms.length) term = pick(terms);
+    else if (state.seenTerms.length) term = pick(state.seenTerms);
+
+    let tpl = pick(TEMPLATES[strategy]);
+
+    if (strategy === "comparar") {
+      const opts = [...new Set([...newTerms, ...state.seenTerms])];
+      if (opts.length >= 2) {
+        const a = opts[opts.length - 1];
+        const b = opts[opts.length - 2];
+        tpl = tpl.replace("{a}", a).replace("{b}", b);
+      } else {
+        // sem dois termos, cai pra "por quê"
+        tpl = pick(TEMPLATES.porque);
+      }
+    } else if (strategy === "resumir") {
+      tpl = tpl.replace("{summary}", buildSummary(text));
+    } else {
+      if (tpl.includes("{term}")) {
+        if (!term) tpl = pick(TEMPLATES.porque);
+        else tpl = tpl.replace(/\{term\}/g, term);
+      }
+    }
+
+    if (term && ["definicao","exemplo"].includes(strategy)) {
+      const k = termKey(term);
+      if (!state.askedTerms.includes(k)) state.askedTerms.push(k);
+    }
+    return tpl;
+  }
+
+  function botRespond(userText) {
+    const terms = extractTerms(userText);
+    // registra termos vistos
+    for (const t of terms) {
+      const k = termKey(t);
+      if (!state.seenTerms.some(s => termKey(s) === k)) state.seenTerms.push(t);
+    }
+
+    // Primeira mensagem define o tema
+    if (!state.topic) {
+      state.topic = terms.length ? terms[0] : userText.trim().slice(0, 40);
+    }
+
+    state.concepts += 1;
+    const { strategy, newTerms } = chooseStrategy(userText, terms);
+    const question = fillTemplate(strategy, userText, terms, newTerms);
+    state.lastStrategy = strategy;
+    state.turn += 1;
+
+    const reaction = pick(REACTIONS[state.level] || REACTIONS.curioso);
+    return reaction + " " + question;
+  }
+
+  // ----------------------------- UI -----------------------------
+  function render() {
+    chatEl.innerHTML = "";
+    for (const msg of state.messages) addBubble(msg.who, msg.text, false);
+    conceptCountEl.textContent = state.concepts;
+    levelEl.value = state.level;
+    scrollDown();
+  }
+
+  function addBubble(who, text, save = true) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + who;
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = who === "bot" ? "🧑‍🎓" : "🧑‍🏫";
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    chatEl.appendChild(wrap);
+    if (save) {
+      state.messages.push({ who, text, t: Date.now() });
+      saveState();
+    }
+    scrollDown();
+    return bubble;
+  }
+
+  function scrollDown() { chatEl.scrollTop = chatEl.scrollHeight; }
+
+  function showTyping() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg bot";
+    wrap.id = "typing";
+    wrap.innerHTML = '<div class="avatar">🧑‍🎓</div><div class="bubble typing">pensando numa pergunta…</div>';
+    chatEl.appendChild(wrap);
+    scrollDown();
+  }
+  function hideTyping() {
+    const t = document.getElementById("typing");
+    if (t) t.remove();
+  }
+
+  function handleSend() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = "";
+    inputEl.style.height = "auto";
+    addBubble("me", text);
+
+    showTyping();
+    const delay = 500 + Math.random() * 700;
+    setTimeout(() => {
+      hideTyping();
+      const reply = botRespond(text);
+      addBubble("bot", reply);
+      conceptCountEl.textContent = state.concepts;
+      saveState();
+    }, delay);
+  }
+
+  // ----------------------------- Saudação inicial -----------------------------
+  const GREETING =
+    "Oi! Eu sou seu aluno e sou MUITO curioso 😄\n" +
+    "Escolhe um assunto da sua matéria e começa a me explicar, do jeito que você entende. " +
+    "Eu vou te interrompendo com perguntas pra te obrigar a explicar melhor (é a técnica de Feynman: " +
+    "você só aprende de verdade quando consegue ensinar).\n\n" +
+    "Pode começar: sobre o que vamos falar hoje?";
+
+  function startIfNeeded() {
+    if (!state.started || state.messages.length === 0) {
+      state.started = true;
+      state.messages = [];
+      addBubble("bot", GREETING);
+      saveState();
+    } else {
+      render();
+    }
+  }
+
+  // ----------------------------- Exportar resumo -----------------------------
+  function exportMarkdown() {
+    const date = new Date().toLocaleString("pt-BR");
+    let md = "# Sessão de estudo — Aluno Curioso\n\n";
+    md += "**Data:** " + date + "\n";
+    if (state.topic) md += "**Tema:** " + state.topic + "\n";
+    md += "**Conceitos explicados:** " + state.concepts + "\n\n";
+    if (state.seenTerms.length) md += "**Termos que apareceram:** " + state.seenTerms.join(", ") + "\n\n";
+    md += "---\n\n## Conversa\n\n";
+    for (const m of state.messages) {
+      const who = m.who === "bot" ? "🧑‍🎓 Aluno" : "🧑‍🏫 Você (professor)";
+      md += "**" + who + ":** " + m.text.replace(/\n/g, "\n> ") + "\n\n";
+    }
+    md += "---\n\n## Para revisar depois\n";
+    md += "- Releia suas explicações e veja quais ficaram confusas.\n";
+    md += "- Os pontos em que o aluno insistiu são provavelmente os que você ainda não domina.\n";
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "estudo-aluno-curioso.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ----------------------------- Eventos -----------------------------
+  sendBtn.addEventListener("click", handleSend);
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  });
+  inputEl.addEventListener("input", () => {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
+  });
+  levelEl.addEventListener("change", () => { state.level = levelEl.value; saveState(); });
+  resetBtn.addEventListener("click", () => {
+    if (confirm("Começar uma nova sessão? A conversa atual será apagada.")) {
+      state = freshState();
+      state.level = levelEl.value;
+      saveState();
+      chatEl.innerHTML = "";
+      startIfNeeded();
+    }
+  });
+  exportBtn.addEventListener("click", exportMarkdown);
+
+  // ----------------------------- Boot -----------------------------
+  startIfNeeded();
+  inputEl.focus();
+})();
+</script>
+</body>
+</html>
